@@ -9,28 +9,32 @@ import plotly.graph_objects as go
 # CONFIG
 # ======================
 st.set_page_config(page_title="Customer Intelligence Dashboard", layout="wide")
+
+# ======================
+# GLOBAL CSS (FIXES UI)
+# ======================
 st.markdown("""
 <style>
 
-/* -------- KPI CARDS -------- */
+/* KPI Cards */
 .kpi-card {
     padding: 18px;
     border-radius: 12px;
     color: white;
     text-align: center;
     box-shadow: 0px 4px 12px rgba(0,0,0,0.15);
-    margin-bottom: 12px;  /* mobile spacing */
+    margin-bottom: 12px;
 }
 
-/* -------- PROFILE BOX -------- */
+/* Profile Box */
 .profile-box {
     border-radius: 12px;
     padding: 20px;
     border: 1px solid rgba(128,128,128,0.2);
-    background-color: rgba(0,0,0,0.03); /* works in both themes */
+    background-color: rgba(0,0,0,0.03);
 }
 
-/* DARK MODE FIX */
+/* Dark Mode Fix */
 @media (prefers-color-scheme: dark) {
     .profile-box {
         background-color: rgba(255,255,255,0.05);
@@ -50,7 +54,7 @@ df = pd.read_csv("data/customer_segments.csv")
 products = pd.read_csv("data/top_products_by_segment.csv")
 
 # ======================
-# SEGMENT MAP + COLORS
+# SEGMENT MAP
 # ======================
 segment_map = {
     1: "💎 High Value",
@@ -112,40 +116,29 @@ revenue_pct = (segment_revenue[segment] / total_revenue) * 100
 st.title("📊 Customer Intelligence Dashboard")
 
 # ======================
-# KPI CARDS (DESIGNED)
+# KPI CARDS
 # ======================
-col1, col2, col3 = st.columns(3)
-
 def card(title, value, color):
     return f"""
-    <div style="
-        background-color:{color};
-        padding:18px;
-        border-radius:12px;
-        color:white;
-        text-align:center;
-        box-shadow:0px 4px 12px rgba(0,0,0,0.15)">
+    <div class="kpi-card" style="background-color:{color};">
         <h5>{title}</h5>
         <h2>{value}</h2>
     </div>
     """
+
+col1, col2, col3 = st.columns(3, gap="medium")
 
 col1.markdown(card("Segment", segment, segment_colors[segment]), unsafe_allow_html=True)
 col2.markdown(card("Customer %", f"{customer_pct:.2f}%", "#34495E"), unsafe_allow_html=True)
 col3.markdown(card("Revenue %", f"{revenue_pct:.2f}%", "#2C3E50"), unsafe_allow_html=True)
 
 # ======================
-# PROFILE BOX (CLEAN)
+# PROFILE BOX
 # ======================
 st.markdown("### Customer Profile")
 
 st.markdown(f"""
-<div style="
-    border:1px solid #ddd;
-    border-radius:12px;
-    padding:20px;
-    background-color:#fafafa;
-">
+<div class="profile-box">
     <b>Recency:</b> {recency} days<br>
     <b>Frequency:</b> {frequency}<br>
     <b>Monetary:</b> {monetary}<br>
@@ -159,13 +152,13 @@ st.markdown(f"""
 st.markdown("### Behavior Insight")
 
 if segment == "💎 High Value":
-    st.success("This customer is a high-value, frequent buyer contributing significantly to revenue.")
+    st.success("High-value, frequent buyer contributing significantly to revenue.")
 elif segment == "🛍️ Regular":
-    st.info("This customer is consistent and has strong potential to become high value.")
+    st.info("Consistent customer with strong growth potential.")
 elif segment == "⚠️ At Risk":
-    st.warning("This customer was previously active but is now at risk of churn.")
+    st.warning("Previously active customer now at risk of churn.")
 else:
-    st.error("This customer has low engagement and needs nurturing.")
+    st.error("Low engagement customer requiring onboarding strategies.")
 
 # ======================
 # PIE CHARTS
@@ -175,20 +168,23 @@ st.markdown("### Segment Overview")
 c1, c2 = st.columns(2)
 
 with c1:
-    fig1 = px.pie(df, names='Segment', color='Segment',
-                  color_discrete_map=segment_colors,
-                  title="Customer Distribution")
+    fig1 = px.pie(
+        df, names='Segment',
+        color='Segment',
+        color_discrete_map=segment_colors
+    )
     st.plotly_chart(fig1, use_container_width=True)
 
 with c2:
-    fig2 = px.pie(df, values='Monetary', names='Segment',
-                  color='Segment',
-                  color_discrete_map=segment_colors,
-                  title="Revenue Contribution")
+    fig2 = px.pie(
+        df, values='Monetary', names='Segment',
+        color='Segment',
+        color_discrete_map=segment_colors
+    )
     st.plotly_chart(fig2, use_container_width=True)
 
 # ======================
-# SCATTER (IMPROVED MARKER)
+# SCATTER (IMPROVED)
 # ======================
 st.markdown("### Customer Positioning")
 
@@ -201,7 +197,7 @@ fig = px.scatter(
     opacity=0.4
 )
 
-# ADD CUSTOMER ON TOP (IMPORTANT)
+# Highlight customer (TOP LAYER)
 fig.add_trace(go.Scatter(
     x=[frequency],
     y=[monetary],
