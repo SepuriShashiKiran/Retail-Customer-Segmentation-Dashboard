@@ -6,10 +6,10 @@ import plotly.express as px
 
 st.set_page_config(page_title="Customer Segmentation", layout="wide")
 
-st.title("🛍️ Retail Customer Segmentation Dashboard")
+st.title("🛍️ Retail Customer Intelligence Dashboard")
 
 # -----------------------------
-# LOAD DATA
+# LOAD
 # -----------------------------
 @st.cache_data
 def load_data():
@@ -17,15 +17,13 @@ def load_data():
 
 @st.cache_resource
 def load_model():
-    kmeans = joblib.load("model/kmeans.pkl")
-    scaler = joblib.load("model/scaler.pkl")
-    return kmeans, scaler
+    return joblib.load("model/kmeans.pkl"), joblib.load("model/scaler.pkl")
 
 df = load_data()
 kmeans, scaler = load_model()
 
 # -----------------------------
-# SIDEBAR INPUT
+# INPUT
 # -----------------------------
 st.sidebar.header("🔍 Customer Input")
 
@@ -47,83 +45,142 @@ segment_map = {
 }
 
 # -----------------------------
-# PREDICTION
+# PREDICT
 # -----------------------------
-if st.sidebar.button("Predict"):
+input_df = pd.DataFrame([[recency, frequency, monetary, avg_order_value]],
+                        columns=['Recency','Frequency','Monetary','AvgOrderValue'])
 
-    input_df = pd.DataFrame([[recency, frequency, monetary, avg_order_value]],
-                            columns=['Recency','Frequency','Monetary','AvgOrderValue'])
+input_scaled = scaler.transform(np.log1p(input_df))
+cluster = kmeans.predict(input_scaled)[0]
+segment = segment_map[cluster]
 
-    input_log = np.log1p(input_df)
-    input_scaled = scaler.transform(input_log)
+st.sidebar.success(f"Segment: {segment}")
 
-    cluster = kmeans.predict(input_scaled)[0]
-    segment = segment_map[cluster]
+# -----------------------------
+# FILTER DATA
+# -----------------------------
+segment_df = df[df['Segment'] == segment]
 
-    st.sidebar.success(f"Segment: {segment}")
+total_customers = len(df)
+segment_customers = len(segment_df)
 
-    # -----------------------------
-    # USER VISUALIZATION
-    # -----------------------------
-    st.subheader("📍 Your Position vs Customers")
+segment_percent = (segment_customers / total_customers) * 100
 
-    fig = px.scatter(
+total_revenue = df['Monetary'].sum()
+segment_revenue = segment_df['Monetary'].sum()
+
+revenue_percent = (segment_revenue / total_revenue) * 100
+
+# -----------------------------
+# KPI CARDS
+# -----------------------------
+st.subheader("📊 Segment Intelligence")
+
+col1, col2, col3 = st.columns(3)
+
+col1.metric("Segment", segment)
+col2.metric("% Customers", f"{segment_percent:.2f}%")
+col3.metric("% Revenue Contribution", f"{revenue_percent:.2f}%")
+
+# -----------------------------
+# PIE CHARTS
+# -----------------------------
+col1, col2 = st.columns(2)
+
+with col1:
+    fig = px.pie(
         df,
-        x="Frequency",
-        y="Monetary",
-        color="Segment",
-        opacity=0.5
+        names="Segment",
+        title="Customer Distribution"
     )
-
-    fig.add_scatter(
-        x=[frequency],
-        y=[monetary],
-        mode="markers",
-        marker=dict(size=15, color="red"),
-        name="You"
-    )
-
     st.plotly_chart(fig, use_container_width=True)
 
-    # -----------------------------
-    # INSIGHT
-    # -----------------------------
-    st.subheader("🧠 Insight")
+with col2:
+    revenue_df = df.groupby('Segment')['Monetary'].sum().reset_index()
 
-    explanations = {
-        "💎 High Value": "High spend + frequent buyer.",
-        "⭐ Potential Loyal": "Can become high value.",
-        "🛍️ Regular": "Moderate activity.",
-        "🆕 New / Occasional": "Low engagement.",
-        "⚠️ At Risk": "Inactive customer."
-    }
-
-    st.write(explanations[segment])
-
-    # -----------------------------
-    # ACTION
-    # -----------------------------
-    st.subheader("📈 Recommended Action")
-
-    actions = {
-        "💎 High Value": "Reward loyalty, premium offers.",
-        "⭐ Potential Loyal": "Upsell and engage.",
-        "🛍️ Regular": "Increase frequency.",
-        "🆕 New / Occasional": "Onboard properly.",
-        "⚠️ At Risk": "Re-engagement campaigns."
-    }
-
-    st.success(actions[segment])
+    fig = px.pie(
+        revenue_df,
+        names="Segment",
+        values="Monetary",
+        title="Revenue Contribution by Segment"
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 # -----------------------------
-# STATIC DASHBOARD
+# SCATTER WITH USER POINT
 # -----------------------------
-st.subheader("📊 Segment Distribution")
+st.subheader("📍 Your Position in Market")
 
-fig = px.histogram(df, x="Segment", color="Segment")
+fig = px.scatter(
+    df,
+    x="Frequency",
+    y="Monetary",
+    color="Segment",
+    opacity=0.4
+)
+
+# CUSTOM ICON FOR USER
+fig.add_scatter(
+    x=[frequency],
+    y=[monetary],
+    mode="markers",
+    marker=dict(
+        size=18,
+        symbol="star",
+        color="gold",
+        line=dict(width=2, color="black")
+    ),
+    name="⭐ You"
+)
+
 st.plotly_chart(fig, use_container_width=True)
 
-st.subheader("📉 Recency vs Frequency")
+# -----------------------------
+# SEGMENT COMPARISON
+# -----------------------------
+st.subheader("📊 You vs Segment Average")
 
-fig = px.scatter(df, x="Recency", y="Frequency", color="Segment")
+avg_vals = segment_df[['Recency','Frequency','Monetary']].mean()
+
+compare_df = pd.DataFrame({
+    "Metric": ["Recency", "Frequency", "Monetary"],
+    "You": [recency, frequency, monetary],
+    "Segment Avg": [
+        avg_vals['Recency'],
+        avg_vals['Frequency'],
+        avg_vals['Monetary']
+    ]
+})
+
+fig = px.bar(compare_df, x="Metric", y=["You","Segment Avg"], barmode="group")
 st.plotly_chart(fig, use_container_width=True)
+
+# -----------------------------
+# INSIGHTS
+# -----------------------------
+st.subheader("🧠 Business Insight")
+
+insights = {
+    "💎 High Value": "You are among top customers. Strong retention strategy needed.",
+    "⭐ Potential Loyal": "You are growing. Push toward loyalty.",
+    "🛍️ Regular": "Stable customer. Increase engagement.",
+    "🆕 New / Occasional": "Low engagement. Improve onboarding.",
+    "⚠️ At Risk": "High churn risk. Immediate action needed."
+}
+
+st.info(insights[segment])
+
+# -----------------------------
+# ACTIONS
+# -----------------------------
+st.subheader("📈 Recommended Action")
+
+actions = {
+    "💎 High Value": "VIP rewards, premium offers",
+    "⭐ Potential Loyal": "Upsell, loyalty programs",
+    "🛍️ Regular": "Increase frequency via campaigns",
+    "🆕 New / Occasional": "Onboarding offers",
+    "⚠️ At Risk": "Discounts & reactivation campaigns"
+}
+
+st.success(actions[segment])
