@@ -9,6 +9,36 @@ import plotly.graph_objects as go
 # CONFIG
 # ======================
 st.set_page_config(page_title="Customer Intelligence Dashboard", layout="wide")
+st.markdown("""
+<style>
+
+/* -------- KPI CARDS -------- */
+.kpi-card {
+    padding: 18px;
+    border-radius: 12px;
+    color: white;
+    text-align: center;
+    box-shadow: 0px 4px 12px rgba(0,0,0,0.15);
+    margin-bottom: 12px;  /* mobile spacing */
+}
+
+/* -------- PROFILE BOX -------- */
+.profile-box {
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(128,128,128,0.2);
+    background-color: rgba(0,0,0,0.03); /* works in both themes */
+}
+
+/* DARK MODE FIX */
+@media (prefers-color-scheme: dark) {
+    .profile-box {
+        background-color: rgba(255,255,255,0.05);
+    }
+}
+
+</style>
+""", unsafe_allow_html=True)
 
 # ======================
 # LOAD DATA
