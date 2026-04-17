@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import joblib
 import plotly.express as px
+import plotly.graph_objects as go
 
 # ======================
 # CONFIG
@@ -29,10 +30,10 @@ segment_map = {
 }
 
 segment_colors = {
-    "💎 High Value": "#2E86C1",
-    "🛍️ Regular": "#28B463",
-    "⚠️ At Risk": "#E67E22",
-    "🆕 New / Low Value": "#7D3C98"
+    "💎 High Value": "#1F77B4",
+    "🛍️ Regular": "#2CA02C",
+    "⚠️ At Risk": "#FF7F0E",
+    "🆕 New / Low Value": "#9467BD"
 }
 
 # ======================
@@ -48,7 +49,7 @@ st.sidebar.markdown("""
 ### ℹ️ RFM Explained
 - **Recency** → How recently customer purchased  
 - **Frequency** → How often  
-- **Monetary** → How much spent  
+- **Monetary** → Total spend  
 """)
 
 # ======================
@@ -66,12 +67,6 @@ cluster, avg_order = predict(recency, frequency, monetary)
 segment = segment_map[cluster]
 
 # ======================
-# HEADER
-# ======================
-st.title("📊 Customer Intelligence Dashboard")
-st.markdown("Real-time segmentation with business insights")
-
-# ======================
 # KPI CALCULATIONS
 # ======================
 segment_counts = df['Segment'].value_counts(normalize=True) * 100
@@ -82,77 +77,90 @@ customer_pct = segment_counts[segment]
 revenue_pct = (segment_revenue[segment] / total_revenue) * 100
 
 # ======================
-# KPI CARDS
+# TITLE
+# ======================
+st.title("📊 Customer Intelligence Dashboard")
+
+# ======================
+# KPI CARDS (DESIGNED)
 # ======================
 col1, col2, col3 = st.columns(3)
 
-with col1:
-    st.markdown(f"""
-    <div style="background-color:{segment_colors[segment]};padding:15px;border-radius:10px;color:white">
-        <h4>Segment</h4>
-        <h2>{segment}</h2>
+def card(title, value, color):
+    return f"""
+    <div style="
+        background-color:{color};
+        padding:18px;
+        border-radius:12px;
+        color:white;
+        text-align:center;
+        box-shadow:0px 4px 12px rgba(0,0,0,0.15)">
+        <h5>{title}</h5>
+        <h2>{value}</h2>
     </div>
-    """, unsafe_allow_html=True)
+    """
 
-with col2:
-    st.metric("Customer %", f"{customer_pct:.2f}%")
-
-with col3:
-    st.metric("Revenue Contribution", f"{revenue_pct:.2f}%")
+col1.markdown(card("Segment", segment, segment_colors[segment]), unsafe_allow_html=True)
+col2.markdown(card("Customer %", f"{customer_pct:.2f}%", "#34495E"), unsafe_allow_html=True)
+col3.markdown(card("Revenue %", f"{revenue_pct:.2f}%", "#2C3E50"), unsafe_allow_html=True)
 
 # ======================
-# PROFILE + INSIGHTS
+# PROFILE BOX (CLEAN)
 # ======================
-colA, colB = st.columns([1,2])
+st.markdown("### Customer Profile")
 
-with colA:
-    st.subheader("Customer Profile")
-    st.metric("Recency", recency)
-    st.metric("Frequency", frequency)
-    st.metric("Monetary", monetary)
-    st.metric("Avg Order Value", f"{avg_order:.2f}")
+st.markdown(f"""
+<div style="
+    border:1px solid #ddd;
+    border-radius:12px;
+    padding:20px;
+    background-color:#fafafa;
+">
+    <b>Recency:</b> {recency} days<br>
+    <b>Frequency:</b> {frequency}<br>
+    <b>Monetary:</b> {monetary}<br>
+    <b>Avg Order Value:</b> {avg_order:.2f}
+</div>
+""", unsafe_allow_html=True)
 
-with colB:
-    st.subheader("Behavior Insight")
+# ======================
+# INSIGHT
+# ======================
+st.markdown("### Behavior Insight")
 
-    if segment == "💎 High Value":
-        st.success("High-value, frequent buyer. Core revenue driver.")
-    elif segment == "🛍️ Regular":
-        st.info("Consistent customer with growth potential.")
-    elif segment == "⚠️ At Risk":
-        st.warning("Previously valuable, now inactive.")
-    else:
-        st.error("Low engagement, early-stage customer.")
+if segment == "💎 High Value":
+    st.success("This customer is a high-value, frequent buyer contributing significantly to revenue.")
+elif segment == "🛍️ Regular":
+    st.info("This customer is consistent and has strong potential to become high value.")
+elif segment == "⚠️ At Risk":
+    st.warning("This customer was previously active but is now at risk of churn.")
+else:
+    st.error("This customer has low engagement and needs nurturing.")
 
 # ======================
 # PIE CHARTS
 # ======================
-st.subheader("Segment Overview")
+st.markdown("### Segment Overview")
 
 c1, c2 = st.columns(2)
 
 with c1:
-    fig1 = px.pie(
-        df, names='Segment',
-        title="Customer Distribution",
-        color='Segment',
-        color_discrete_map=segment_colors
-    )
+    fig1 = px.pie(df, names='Segment', color='Segment',
+                  color_discrete_map=segment_colors,
+                  title="Customer Distribution")
     st.plotly_chart(fig1, use_container_width=True)
 
 with c2:
-    fig2 = px.pie(
-        df, values='Monetary', names='Segment',
-        title="Revenue Contribution",
-        color='Segment',
-        color_discrete_map=segment_colors
-    )
+    fig2 = px.pie(df, values='Monetary', names='Segment',
+                  color='Segment',
+                  color_discrete_map=segment_colors,
+                  title="Revenue Contribution")
     st.plotly_chart(fig2, use_container_width=True)
 
 # ======================
-# SCATTER (KEY VISUAL)
+# SCATTER (IMPROVED MARKER)
 # ======================
-st.subheader("Customer Positioning")
+st.markdown("### Customer Positioning")
 
 fig = px.scatter(
     df,
@@ -160,23 +168,31 @@ fig = px.scatter(
     y="Monetary",
     color="Segment",
     color_discrete_map=segment_colors,
-    opacity=0.5
+    opacity=0.4
 )
 
-fig.add_scatter(
+# ADD CUSTOMER ON TOP (IMPORTANT)
+fig.add_trace(go.Scatter(
     x=[frequency],
     y=[monetary],
-    mode='markers',
-    marker=dict(size=14, color='black'),
+    mode='markers+text',
+    marker=dict(
+        size=16,
+        color='black',
+        symbol='diamond',
+        line=dict(width=2, color='white')
+    ),
+    text=["This Customer"],
+    textposition="top center",
     name="This Customer"
-)
+))
 
 st.plotly_chart(fig, use_container_width=True)
 
 # ======================
-# PRODUCT INTELLIGENCE
+# PRODUCT INSIGHTS
 # ======================
-st.subheader("Likely Products This Customer May Buy")
+st.markdown("### Likely Products This Customer May Buy")
 
 top_items = products[products['Segment'] == segment].head(5)
 
@@ -185,7 +201,6 @@ fig_prod = px.bar(
     x='TotalPrice',
     y='Description',
     orientation='h',
-    title="Top Products by Revenue",
     color_discrete_sequence=[segment_colors[segment]]
 )
 
@@ -194,32 +209,21 @@ st.plotly_chart(fig_prod, use_container_width=True)
 # ======================
 # BUSINESS ACTIONS
 # ======================
-st.subheader("Recommended Business Actions")
+st.markdown("### Recommended Actions")
 
 if segment == "💎 High Value":
-    st.write("• Loyalty programs")
-    st.write("• Exclusive offers")
-    st.write("• Premium bundles")
-
+    st.write("• Loyalty programs • Premium offers • Exclusive deals")
 elif segment == "🛍️ Regular":
-    st.write("• Upsell bundles")
-    st.write("• Incentivize frequency")
-    st.write("• Targeted promotions")
-
+    st.write("• Upsell bundles • Encourage repeat purchases")
 elif segment == "⚠️ At Risk":
-    st.write("• Re-engagement emails")
-    st.write("• Discounts")
-    st.write("• Reminder campaigns")
-
+    st.write("• Discounts • Re-engagement campaigns")
 else:
-    st.write("• First-time offers")
-    st.write("• Onboarding discounts")
-    st.write("• Encourage repeat purchase")
+    st.write("• Onboarding offers • First-time incentives")
 
 # ======================
-# CORRELATION HEATMAP
+# HEATMAP
 # ======================
-st.subheader("Feature Relationships")
+st.markdown("### Feature Relationships")
 
 corr = df[['Recency','Frequency','Monetary']].corr()
 
