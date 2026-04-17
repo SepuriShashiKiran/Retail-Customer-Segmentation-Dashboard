@@ -3,236 +3,176 @@ import pandas as pd
 import numpy as np
 import joblib
 import plotly.express as px
-import seaborn as sns
-import matplotlib.pyplot as plt
 
-# -----------------------------
-# CONFIG
-# -----------------------------
-st.set_page_config(page_title="Customer Intelligence", layout="wide")
+# ======================
+# LOAD FILES
+# ======================
+kmeans = joblib.load("model/kmeans.pkl")
+scaler = joblib.load("model/scaler.pkl")
 
-st.title("🛍️ Retail Customer Intelligence Dashboard")
+df = pd.read_csv("data/customer_segments.csv")
+products = pd.read_csv("data/top_products_by_segment.csv")
 
-# -----------------------------
-# RFM EXPLANATION (USER FRIENDLY)
-# -----------------------------
-with st.expander("ℹ️ What do these inputs mean? (Simple Explanation)"):
-    st.markdown("""
-    **Recency (R)** → How recently a customer made a purchase  
-    - Lower = very recent (good)  
-    - Higher = long time ago (risk)
-
-    **Frequency (F)** → How often the customer buys  
-    - Higher = frequent buyer  
-    - Lower = occasional buyer  
-
-    **Monetary (M)** → Total money spent  
-    - Higher = valuable customer  
-    - Lower = low-value customer  
-
-    👉 Together, these help businesses understand:
-    - Who are their best customers  
-    - Who might stop buying  
-    - Who needs engagement  
-    """)
-
-# -----------------------------
-# LOAD
-# -----------------------------
-@st.cache_data
-def load_data():
-    return pd.read_csv("data/features.csv")
-
-@st.cache_resource
-def load_model():
-    return joblib.load("model/kmeans.pkl"), joblib.load("model/scaler.pkl")
-
-df = load_data()
-kmeans, scaler = load_model()
-
-# -----------------------------
-# SIDEBAR INPUT
-# -----------------------------
-st.sidebar.header("🔍 Customer Input")
-
-recency = st.sidebar.slider("Recency (days)", 0, 365, 50)
-frequency = st.sidebar.slider("Frequency", 1, 50, 5)
-monetary = st.sidebar.slider("Monetary Spend", 0, 20000, 1000)
-
-avg_order_value = monetary / frequency
-
-# -----------------------------
-# SEGMENT MAP
-# -----------------------------
+# ======================
+# SEGMENT MAPPING
+# ======================
 segment_map = {
-    0: "⚠️ At Risk",
-    1: "🛍️ Regular",
-    2: "💎 High Value",
-    3: "🆕 New / Occasional",
-    4: "⭐ Potential Loyal"
+    1: "💎 High Value",
+    3: "🛍️ Regular",
+    2: "⚠️ At Risk",
+    0: "🆕 New / Low Value"
 }
 
-# -----------------------------
-# PREDICT
-# -----------------------------
-input_df = pd.DataFrame([[recency, frequency, monetary, avg_order_value]],
-                        columns=['Recency','Frequency','Monetary','AvgOrderValue'])
+# ======================
+# PAGE CONFIG
+# ======================
+st.set_page_config(page_title="Customer Segmentation BI", layout="wide")
 
-input_scaled = scaler.transform(np.log1p(input_df))
-cluster = kmeans.predict(input_scaled)[0]
+st.title("📊 Retail Customer Segmentation Dashboard")
+
+# ======================
+# SIDEBAR INPUT
+# ======================
+st.sidebar.header("Customer Input")
+
+recency = st.sidebar.number_input("Recency (days since last purchase)", 0, 400, 30)
+frequency = st.sidebar.number_input("Frequency (number of purchases)", 1, 300, 2)
+monetary = st.sidebar.number_input("Monetary (total spend)", 1, 300000, 500)
+
+# ======================
+# RFM EXPLANATION
+# ======================
+st.markdown("""
+### ℹ️ What is RFM?
+
+- **Recency** → How recently the customer purchased  
+- **Frequency** → How often they purchase  
+- **Monetary** → How much they spend  
+
+👉 These help identify customer value and behavior.
+""")
+
+# ======================
+# PREDICTION FUNCTION
+# ======================
+def predict_customer(r, f, m):
+    avg_order = m / f
+    data = np.array([[r, f, m, avg_order]])
+    data_log = np.log1p(data)
+    data_scaled = scaler.transform(data_log)
+    cluster = kmeans.predict(data_scaled)[0]
+    return cluster, avg_order
+
+cluster, avg_order = predict_customer(recency, frequency, monetary)
 segment = segment_map[cluster]
 
-st.sidebar.success(f"Segment: {segment}")
+# ======================
+# MAIN LAYOUT
+# ======================
+col1, col2 = st.columns([1, 2])
 
-# -----------------------------
-# FILTER DATA
-# -----------------------------
-segment_df = df[df['Segment'] == segment]
+# ======================
+# CUSTOMER PROFILE CARD
+# ======================
+with col1:
+    st.subheader("Customer Profile")
 
-total_customers = len(df)
-segment_customers = len(segment_df)
-segment_percent = (segment_customers / total_customers) * 100
+    st.metric("Segment", segment)
+    st.metric("Avg Order Value", f"{avg_order:.2f}")
 
-total_revenue = df['Monetary'].sum()
-segment_revenue = segment_df['Monetary'].sum()
-revenue_percent = (segment_revenue / total_revenue) * 100
-
-# -----------------------------
-# TABS
-# -----------------------------
-tab1, tab2, tab3 = st.tabs(["📊 Overview", "🔍 Prediction", "📈 Deep Insights"])
-
-# =========================================================
-# 📊 OVERVIEW
-# =========================================================
-with tab1:
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("Total Customers", total_customers)
-    col2.metric("Total Revenue", f"{int(total_revenue):,}")
-    col3.metric("Your Segment", segment)
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        fig = px.pie(df, names="Segment", title="Customer Distribution")
-        st.plotly_chart(fig, use_container_width=True)
-
-    with col2:
-        rev_df = df.groupby('Segment')['Monetary'].sum().reset_index()
-        fig = px.pie(rev_df, names="Segment", values="Monetary",
-                     title="Revenue Contribution")
-        st.plotly_chart(fig, use_container_width=True)
-
-# =========================================================
-# 🔍 PREDICTION
-# =========================================================
-with tab2:
-
-    st.subheader("📊 Segment Intelligence")
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    col1.markdown(f"""
-    <div style="background:#4CAF50;padding:20px;border-radius:12px;text-align:center;color:white">
-        <h4>Segment</h4><h2>{segment}</h2>
-    </div>
-    """, unsafe_allow_html=True)
-
-    col2.markdown(f"""
-    <div style="background:#2196F3;padding:20px;border-radius:12px;text-align:center;color:white">
-        <h4>% Customers</h4><h2>{segment_percent:.2f}%</h2>
-    </div>
-    """, unsafe_allow_html=True)
-
-    col3.markdown(f"""
-    <div style="background:#FF9800;padding:20px;border-radius:12px;text-align:center;color:white">
-        <h4>% Revenue</h4><h2>{revenue_percent:.2f}%</h2>
-    </div>
-    """, unsafe_allow_html=True)
-
-    col4.markdown(f"""
-    <div style="background:#9C27B0;padding:20px;border-radius:12px;text-align:center;color:white">
-        <h4>Avg Spend</h4><h2>{int(segment_df['Monetary'].mean())}</h2>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Scatter
-    st.subheader("📍 Your Position")
-
-    fig = px.scatter(df, x="Frequency", y="Monetary",
-                     color="Segment", opacity=0.4)
-
-    fig.add_scatter(
-        x=[frequency],
-        y=[monetary],
-        mode="markers+text",
-        text=["YOU"],
-        marker=dict(size=20, color="yellow", line=dict(width=3, color="black")),
-        name="You"
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
-
-    # Insights
-    st.subheader("🧠 Smart Insights")
-
-    if monetary > segment_df['Monetary'].mean():
-        st.success("💰 You spend MORE than your segment average")
+    if segment == "💎 High Value":
+        st.success("High revenue, frequent and loyal customer.")
+    elif segment == "🛍️ Regular":
+        st.info("Consistent customer with moderate spend.")
+    elif segment == "⚠️ At Risk":
+        st.warning("Customer inactive — needs re-engagement.")
     else:
-        st.warning("💰 You spend LESS than your segment average")
+        st.error("Low engagement, early-stage customer.")
 
-    if frequency > segment_df['Frequency'].mean():
-        st.success("🔁 You purchase MORE frequently")
-    else:
-        st.warning("🔁 Your purchase frequency is lower")
+# ======================
+# DATA FOR CHARTS
+# ======================
+segment_counts = df['Segment'].value_counts().reset_index()
+segment_counts.columns = ['Segment','Count']
 
-    if recency > segment_df['Recency'].mean():
-        st.error("⚠️ You are becoming inactive")
-    else:
-        st.success("✅ You are an active customer")
+segment_revenue = df.groupby('Segment')['Monetary'].sum().reset_index()
 
-# =========================================================
-# 📈 DEEP INSIGHTS
-# =========================================================
-with tab3:
+# ======================
+# PIE CHARTS
+# ======================
+with col2:
+    st.subheader("Segment Intelligence")
 
-    st.subheader("📈 Segment Value Analysis")
+    c1, c2 = st.columns(2)
 
-    summary = df.groupby('Segment').agg({
-        'CustomerID':'count',
-        'Monetary':'sum'
-    }).reset_index()
+    with c1:
+        fig1 = px.pie(segment_counts, values='Count', names='Segment',
+                      title="Customer Distribution")
+        st.plotly_chart(fig1, use_container_width=True)
 
-    summary.columns = ['Segment','Customers','Revenue']
+    with c2:
+        fig2 = px.pie(segment_revenue, values='Monetary', names='Segment',
+                      title="Revenue Contribution")
+        st.plotly_chart(fig2, use_container_width=True)
 
-    summary['Customer %'] = summary['Customers'] / summary['Customers'].sum()
-    summary['Revenue %'] = summary['Revenue'] / summary['Revenue'].sum()
+# ======================
+# SCATTER PLOT (INTERACTIVE)
+# ======================
+st.subheader("Customer Behavior Analysis")
 
-    fig = px.bar(summary, x="Segment",
-                 y=["Customer %","Revenue %"],
-                 barmode="group")
+fig = px.scatter(
+    df,
+    x="Frequency",
+    y="Monetary",
+    color="Segment",
+    opacity=0.6,
+    title="Frequency vs Monetary"
+)
 
-    st.plotly_chart(fig, use_container_width=True)
+# highlight input customer
+fig.add_scatter(
+    x=[frequency],
+    y=[monetary],
+    mode='markers',
+    marker=dict(size=12, color='black'),
+    name="This Customer"
+)
 
-    st.subheader("🔥 Feature Heatmap")
+st.plotly_chart(fig, use_container_width=True)
 
-    heatmap_data = df.groupby('Segment')[['Recency','Frequency','Monetary']].mean()
+# ======================
+# RECOMMENDED PRODUCTS
+# ======================
+st.subheader("Top Products for this Segment")
 
-    fig, ax = plt.subplots()
-    sns.heatmap(heatmap_data, annot=True, cmap="coolwarm", ax=ax)
-    st.pyplot(fig)
+top_items = products[products['Segment'] == segment].head(5)
 
-    st.subheader("📊 Spend Distribution")
+st.dataframe(top_items[['Description','TotalPrice']])
 
-    fig = px.histogram(segment_df, x="Monetary", nbins=50)
+# ======================
+# BUSINESS INSIGHTS
+# ======================
+st.subheader("Business Insights")
 
-    fig.add_vline(
-        x=monetary,
-        line_width=3,
-        line_dash="dash",
-        line_color="red"
-    )
+if segment == "💎 High Value":
+    st.write("- Offer loyalty rewards")
+    st.write("- Provide premium products")
+elif segment == "🛍️ Regular":
+    st.write("- Upsell with bundles")
+    st.write("- Encourage repeat purchases")
+elif segment == "⚠️ At Risk":
+    st.write("- Send discounts or reminders")
+    st.write("- Re-engagement campaigns")
+else:
+    st.write("- Onboard with offers")
+    st.write("- Encourage second purchase")
 
-    st.plotly_chart(fig, use_container_width=True)
+# ======================
+# CORRELATION HEATMAP
+# ======================
+st.subheader("Feature Correlation")
+
+corr = df[['Recency','Frequency','Monetary']].corr()
+
+fig_corr = px.imshow(corr, text_auto=True)
+st.plotly_chart(fig_corr, use_container_width=True)
