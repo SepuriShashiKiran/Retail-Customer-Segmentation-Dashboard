@@ -14,6 +14,29 @@ st.set_page_config(page_title="Customer Intelligence", layout="wide")
 st.title("🛍️ Retail Customer Intelligence Dashboard")
 
 # -----------------------------
+# RFM EXPLANATION (USER FRIENDLY)
+# -----------------------------
+with st.expander("ℹ️ What do these inputs mean? (Simple Explanation)"):
+    st.markdown("""
+    **Recency (R)** → How recently a customer made a purchase  
+    - Lower = very recent (good)  
+    - Higher = long time ago (risk)
+
+    **Frequency (F)** → How often the customer buys  
+    - Higher = frequent buyer  
+    - Lower = occasional buyer  
+
+    **Monetary (M)** → Total money spent  
+    - Higher = valuable customer  
+    - Lower = low-value customer  
+
+    👉 Together, these help businesses understand:
+    - Who are their best customers  
+    - Who might stop buying  
+    - Who needs engagement  
+    """)
+
+# -----------------------------
 # LOAD
 # -----------------------------
 @st.cache_data
@@ -32,9 +55,9 @@ kmeans, scaler = load_model()
 # -----------------------------
 st.sidebar.header("🔍 Customer Input")
 
-recency = st.sidebar.slider("Recency", 0, 365, 50)
+recency = st.sidebar.slider("Recency (days)", 0, 365, 50)
 frequency = st.sidebar.slider("Frequency", 1, 50, 5)
-monetary = st.sidebar.slider("Monetary", 0, 20000, 1000)
+monetary = st.sidebar.slider("Monetary Spend", 0, 20000, 1000)
 
 avg_order_value = monetary / frequency
 
@@ -80,19 +103,16 @@ revenue_percent = (segment_revenue / total_revenue) * 100
 tab1, tab2, tab3 = st.tabs(["📊 Overview", "🔍 Prediction", "📈 Deep Insights"])
 
 # =========================================================
-# 📊 TAB 1: OVERVIEW
+# 📊 OVERVIEW
 # =========================================================
 with tab1:
-
-    st.subheader("📊 Business Overview")
 
     col1, col2, col3 = st.columns(3)
 
     col1.metric("Total Customers", total_customers)
     col2.metric("Total Revenue", f"{int(total_revenue):,}")
-    col3.metric("Active Segment", segment)
+    col3.metric("Your Segment", segment)
 
-    # Distribution
     col1, col2 = st.columns(2)
 
     with col1:
@@ -106,40 +126,39 @@ with tab1:
         st.plotly_chart(fig, use_container_width=True)
 
 # =========================================================
-# 🔍 TAB 2: PREDICTION
+# 🔍 PREDICTION
 # =========================================================
 with tab2:
 
-    st.subheader("🔍 Customer Analysis")
+    st.subheader("📊 Segment Intelligence")
 
-    # KPI CARDS
     col1, col2, col3, col4 = st.columns(4)
 
     col1.markdown(f"""
-    <div style="background:#1f2937;padding:20px;border-radius:10px;text-align:center">
+    <div style="background:#4CAF50;padding:20px;border-radius:12px;text-align:center;color:white">
         <h4>Segment</h4><h2>{segment}</h2>
     </div>
     """, unsafe_allow_html=True)
 
     col2.markdown(f"""
-    <div style="background:#1f2937;padding:20px;border-radius:10px;text-align:center">
-        <h4>Customers</h4><h2>{segment_percent:.2f}%</h2>
+    <div style="background:#2196F3;padding:20px;border-radius:12px;text-align:center;color:white">
+        <h4>% Customers</h4><h2>{segment_percent:.2f}%</h2>
     </div>
     """, unsafe_allow_html=True)
 
     col3.markdown(f"""
-    <div style="background:#1f2937;padding:20px;border-radius:10px;text-align:center">
-        <h4>Revenue</h4><h2>{revenue_percent:.2f}%</h2>
+    <div style="background:#FF9800;padding:20px;border-radius:12px;text-align:center;color:white">
+        <h4>% Revenue</h4><h2>{revenue_percent:.2f}%</h2>
     </div>
     """, unsafe_allow_html=True)
 
     col4.markdown(f"""
-    <div style="background:#1f2937;padding:20px;border-radius:10px;text-align:center">
+    <div style="background:#9C27B0;padding:20px;border-radius:12px;text-align:center;color:white">
         <h4>Avg Spend</h4><h2>{int(segment_df['Monetary'].mean())}</h2>
     </div>
     """, unsafe_allow_html=True)
 
-    # SCATTER
+    # Scatter
     st.subheader("📍 Your Position")
 
     fig = px.scatter(df, x="Frequency", y="Monetary",
@@ -156,26 +175,26 @@ with tab2:
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # PERSONAL INSIGHTS
+    # Insights
     st.subheader("🧠 Smart Insights")
 
     if monetary > segment_df['Monetary'].mean():
-        st.success("💰 You spend MORE than your segment")
+        st.success("💰 You spend MORE than your segment average")
     else:
-        st.warning("💰 You spend LESS than your segment")
+        st.warning("💰 You spend LESS than your segment average")
 
     if frequency > segment_df['Frequency'].mean():
-        st.success("🔁 Higher purchase frequency than peers")
+        st.success("🔁 You purchase MORE frequently")
     else:
-        st.warning("🔁 Lower frequency than peers")
+        st.warning("🔁 Your purchase frequency is lower")
 
     if recency > segment_df['Recency'].mean():
-        st.error("⚠️ Becoming inactive compared to segment")
+        st.error("⚠️ You are becoming inactive")
     else:
-        st.success("✅ Active customer")
+        st.success("✅ You are an active customer")
 
 # =========================================================
-# 📈 TAB 3: DEEP INSIGHTS
+# 📈 DEEP INSIGHTS
 # =========================================================
 with tab3:
 
@@ -197,7 +216,6 @@ with tab3:
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # HEATMAP
     st.subheader("🔥 Feature Heatmap")
 
     heatmap_data = df.groupby('Segment')[['Recency','Frequency','Monetary']].mean()
@@ -206,7 +224,6 @@ with tab3:
     sns.heatmap(heatmap_data, annot=True, cmap="coolwarm", ax=ax)
     st.pyplot(fig)
 
-    # DISTRIBUTION
     st.subheader("📊 Spend Distribution")
 
     fig = px.histogram(segment_df, x="Monetary", nbins=50)
