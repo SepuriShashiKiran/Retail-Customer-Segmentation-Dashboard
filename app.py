@@ -3,8 +3,13 @@ import pandas as pd
 import numpy as np
 import joblib
 import plotly.express as px
+import seaborn as sns
+import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="Customer Segmentation", layout="wide")
+# -----------------------------
+# CONFIG
+# -----------------------------
+st.set_page_config(page_title="Customer Intelligence", layout="wide")
 
 st.title("🛍️ Retail Customer Intelligence Dashboard")
 
@@ -23,7 +28,7 @@ df = load_data()
 kmeans, scaler = load_model()
 
 # -----------------------------
-# INPUT
+# SIDEBAR INPUT
 # -----------------------------
 st.sidebar.header("🔍 Customer Input")
 
@@ -63,124 +68,154 @@ segment_df = df[df['Segment'] == segment]
 
 total_customers = len(df)
 segment_customers = len(segment_df)
-
 segment_percent = (segment_customers / total_customers) * 100
 
 total_revenue = df['Monetary'].sum()
 segment_revenue = segment_df['Monetary'].sum()
-
 revenue_percent = (segment_revenue / total_revenue) * 100
 
 # -----------------------------
-# KPI CARDS
+# TABS
 # -----------------------------
-st.subheader("📊 Segment Intelligence")
+tab1, tab2, tab3 = st.tabs(["📊 Overview", "🔍 Prediction", "📈 Deep Insights"])
 
-col1, col2, col3 = st.columns(3)
+# =========================================================
+# 📊 TAB 1: OVERVIEW
+# =========================================================
+with tab1:
 
-col1.metric("Segment", segment)
-col2.metric("% Customers", f"{segment_percent:.2f}%")
-col3.metric("% Revenue Contribution", f"{revenue_percent:.2f}%")
+    st.subheader("📊 Business Overview")
 
-# -----------------------------
-# PIE CHARTS
-# -----------------------------
-col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
-with col1:
-    fig = px.pie(
-        df,
-        names="Segment",
-        title="Customer Distribution"
+    col1.metric("Total Customers", total_customers)
+    col2.metric("Total Revenue", f"{int(total_revenue):,}")
+    col3.metric("Active Segment", segment)
+
+    # Distribution
+    col1, col2 = st.columns(2)
+
+    with col1:
+        fig = px.pie(df, names="Segment", title="Customer Distribution")
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        rev_df = df.groupby('Segment')['Monetary'].sum().reset_index()
+        fig = px.pie(rev_df, names="Segment", values="Monetary",
+                     title="Revenue Contribution")
+        st.plotly_chart(fig, use_container_width=True)
+
+# =========================================================
+# 🔍 TAB 2: PREDICTION
+# =========================================================
+with tab2:
+
+    st.subheader("🔍 Customer Analysis")
+
+    # KPI CARDS
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.markdown(f"""
+    <div style="background:#1f2937;padding:20px;border-radius:10px;text-align:center">
+        <h4>Segment</h4><h2>{segment}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col2.markdown(f"""
+    <div style="background:#1f2937;padding:20px;border-radius:10px;text-align:center">
+        <h4>Customers</h4><h2>{segment_percent:.2f}%</h2>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col3.markdown(f"""
+    <div style="background:#1f2937;padding:20px;border-radius:10px;text-align:center">
+        <h4>Revenue</h4><h2>{revenue_percent:.2f}%</h2>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col4.markdown(f"""
+    <div style="background:#1f2937;padding:20px;border-radius:10px;text-align:center">
+        <h4>Avg Spend</h4><h2>{int(segment_df['Monetary'].mean())}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # SCATTER
+    st.subheader("📍 Your Position")
+
+    fig = px.scatter(df, x="Frequency", y="Monetary",
+                     color="Segment", opacity=0.4)
+
+    fig.add_scatter(
+        x=[frequency],
+        y=[monetary],
+        mode="markers+text",
+        text=["YOU"],
+        marker=dict(size=20, color="yellow", line=dict(width=3, color="black")),
+        name="You"
     )
+
     st.plotly_chart(fig, use_container_width=True)
 
-with col2:
-    revenue_df = df.groupby('Segment')['Monetary'].sum().reset_index()
+    # PERSONAL INSIGHTS
+    st.subheader("🧠 Smart Insights")
 
-    fig = px.pie(
-        revenue_df,
-        names="Segment",
-        values="Monetary",
-        title="Revenue Contribution by Segment"
-    )
+    if monetary > segment_df['Monetary'].mean():
+        st.success("💰 You spend MORE than your segment")
+    else:
+        st.warning("💰 You spend LESS than your segment")
+
+    if frequency > segment_df['Frequency'].mean():
+        st.success("🔁 Higher purchase frequency than peers")
+    else:
+        st.warning("🔁 Lower frequency than peers")
+
+    if recency > segment_df['Recency'].mean():
+        st.error("⚠️ Becoming inactive compared to segment")
+    else:
+        st.success("✅ Active customer")
+
+# =========================================================
+# 📈 TAB 3: DEEP INSIGHTS
+# =========================================================
+with tab3:
+
+    st.subheader("📈 Segment Value Analysis")
+
+    summary = df.groupby('Segment').agg({
+        'CustomerID':'count',
+        'Monetary':'sum'
+    }).reset_index()
+
+    summary.columns = ['Segment','Customers','Revenue']
+
+    summary['Customer %'] = summary['Customers'] / summary['Customers'].sum()
+    summary['Revenue %'] = summary['Revenue'] / summary['Revenue'].sum()
+
+    fig = px.bar(summary, x="Segment",
+                 y=["Customer %","Revenue %"],
+                 barmode="group")
+
     st.plotly_chart(fig, use_container_width=True)
 
-# -----------------------------
-# SCATTER WITH USER POINT
-# -----------------------------
-st.subheader("📍 Your Position in Market")
+    # HEATMAP
+    st.subheader("🔥 Feature Heatmap")
 
-fig = px.scatter(
-    df,
-    x="Frequency",
-    y="Monetary",
-    color="Segment",
-    opacity=0.4
-)
+    heatmap_data = df.groupby('Segment')[['Recency','Frequency','Monetary']].mean()
 
-# CUSTOM ICON FOR USER
-fig.add_scatter(
-    x=[frequency],
-    y=[monetary],
-    mode="markers",
-    marker=dict(
-        size=18,
-        symbol="star",
-        color="gold",
-        line=dict(width=2, color="black")
-    ),
-    name="⭐ You"
-)
+    fig, ax = plt.subplots()
+    sns.heatmap(heatmap_data, annot=True, cmap="coolwarm", ax=ax)
+    st.pyplot(fig)
 
-st.plotly_chart(fig, use_container_width=True)
+    # DISTRIBUTION
+    st.subheader("📊 Spend Distribution")
 
-# -----------------------------
-# SEGMENT COMPARISON
-# -----------------------------
-st.subheader("📊 You vs Segment Average")
+    fig = px.histogram(segment_df, x="Monetary", nbins=50)
 
-avg_vals = segment_df[['Recency','Frequency','Monetary']].mean()
+    fig.add_vline(
+        x=monetary,
+        line_width=3,
+        line_dash="dash",
+        line_color="red"
+    )
 
-compare_df = pd.DataFrame({
-    "Metric": ["Recency", "Frequency", "Monetary"],
-    "You": [recency, frequency, monetary],
-    "Segment Avg": [
-        avg_vals['Recency'],
-        avg_vals['Frequency'],
-        avg_vals['Monetary']
-    ]
-})
-
-fig = px.bar(compare_df, x="Metric", y=["You","Segment Avg"], barmode="group")
-st.plotly_chart(fig, use_container_width=True)
-
-# -----------------------------
-# INSIGHTS
-# -----------------------------
-st.subheader("🧠 Business Insight")
-
-insights = {
-    "💎 High Value": "You are among top customers. Strong retention strategy needed.",
-    "⭐ Potential Loyal": "You are growing. Push toward loyalty.",
-    "🛍️ Regular": "Stable customer. Increase engagement.",
-    "🆕 New / Occasional": "Low engagement. Improve onboarding.",
-    "⚠️ At Risk": "High churn risk. Immediate action needed."
-}
-
-st.info(insights[segment])
-
-# -----------------------------
-# ACTIONS
-# -----------------------------
-st.subheader("📈 Recommended Action")
-
-actions = {
-    "💎 High Value": "VIP rewards, premium offers",
-    "⭐ Potential Loyal": "Upsell, loyalty programs",
-    "🛍️ Regular": "Increase frequency via campaigns",
-    "🆕 New / Occasional": "Onboarding offers",
-    "⚠️ At Risk": "Discounts & reactivation campaigns"
-}
-
-st.success(actions[segment])
+    st.plotly_chart(fig, use_container_width=True)
