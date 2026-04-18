@@ -161,6 +161,32 @@ else:
     st.error("Low engagement customer requiring onboarding strategies.")
 
 # ======================
+# CUSTOMER VS SEGMENT AVERAGE
+# ======================
+st.markdown("### Customer vs Segment Average")
+
+segment_avg = df[df["Segment"] == segment][["Recency", "Frequency", "Monetary"]].mean()
+
+compare_df = pd.DataFrame({
+    "Metric": ["Recency", "Frequency", "Monetary"],
+    "This Customer": [recency, frequency, monetary],
+    "Segment Average": [
+        segment_avg["Recency"],
+        segment_avg["Frequency"],
+        segment_avg["Monetary"]
+    ]
+})
+
+fig_compare = px.bar(
+    compare_df,
+    x="Metric",
+    y=["This Customer", "Segment Average"],
+    barmode="group",
+    color_discrete_sequence=["#111111", segment_colors[segment]]
+)
+st.plotly_chart(fig_compare, use_container_width=True)
+
+# ======================
 # PIE CHARTS
 # ======================
 st.markdown("### Segment Overview")
