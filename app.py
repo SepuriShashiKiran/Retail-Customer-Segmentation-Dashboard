@@ -77,7 +77,7 @@ st.sidebar.title("Customer Input")
 
 recency = st.sidebar.slider("Recency (days)", 0, 400, 30)
 frequency = st.sidebar.slider("Frequency", 1, 300, 2)
-monetary = st.sidebar.slider("Monetary", 1, 300000, 500)
+monetary = st.sidebar.slider("Monetary", 1, 300000, 100)
 
 st.sidebar.markdown("""
 ### ℹ️ RFM Explained
